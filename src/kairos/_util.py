@@ -53,3 +53,24 @@ def is_zero_scale(scale: float, location: float) -> bool:
     The sample std of a constant series is ~1e-18, not exactly 0.
     """
     return scale <= 1e-12 * max(abs(location), 1e-300) or scale == 0.0
+
+
+def check_returns(x: pd.Series, name: str = "r") -> None:
+    """Raise if a series that should hold returns looks like prices.
+
+    Prices are all positive and usually well above 0.5; per-period returns
+    are essentially never all positive with a median that large.
+    """
+    if len(x) >= 5 and bool((x > 0).all()) and float(x.median()) > 0.5:
+        raise ValueError(
+            f"{name} looks like prices, not returns (every value is positive, "
+            f"median {float(x.median()):.6g}); convert with kairos.returns(prices) "
+            "first"
+        )
+
+
+def clean_returns(x: pd.Series, name: str = "r") -> pd.Series:
+    """:func:`clean_series` plus the prices-passed-as-returns guard."""
+    s = clean_series(x, name)
+    check_returns(s, name)
+    return s

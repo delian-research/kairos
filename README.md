@@ -1,8 +1,15 @@
 # Kairos
 
-Kairos is a small Python package for price analytics: returns, volatility,
-beta, drawdown, performance ratios, tail risk and covariance. Every result says how it was computed, so the conventions
-behind a number are never ambiguous.
+Kairos is the calculation layer for financial risk and performance metrics:
+returns, volatility, beta, drawdown, performance ratios, tail risk,
+covariance, factor regressions, event studies and portfolio math, for single
+securities and for portfolios. Every result says how it was computed, so the
+conventions behind a number are never ambiguous.
+
+It is built to be driven by LLMs as well as people: one call lists every
+function, a usage guide ships inside the package, results convert to
+JSON-safe data, and common mistakes (such as passing prices where returns are
+expected) raise clear errors instead of returning a wrong number.
 
 ## Installation
 
@@ -19,6 +26,20 @@ import kairos as k
 
 Kairos supports Python 3.10+ and depends only on `numpy` and `pandas`. It does
 no I/O: you pass in prices or returns as pandas objects indexed by date.
+
+## For LLM and agent callers
+
+```python
+import kairos as k
+
+print(k.guide())  # conventions, which function answers which question, recipes, pitfalls
+k.catalog()  # DataFrame of every function: area, signature, one-line summary
+k.render(result)  # any result as text, with how it was computed
+k.to_dict(result)  # any result as JSON-safe data (ISO dates, NaN -> null)
+```
+
+The guide is [src/kairos/GUIDE.md](src/kairos/GUIDE.md). Point an agent at
+`kairos.guide()` before it writes analysis code.
 
 ## Conventions
 
@@ -123,6 +144,40 @@ annualizes them and says so in its metadata. Risk-free rates are per period
 | `ewma_cov(r, halflife)` | Exponentially weighted covariance (RiskMetrics) |
 | `ledoit_wolf(r)` | Shrinkage covariance; intensity in `attrs` |
 | `nearest_psd(cov)` | Eigenvalue-clipping repair of a non-PSD matrix |
+
+**Regression and beta variants**
+
+| Function | What it computes |
+|---|---|
+| `factor_regression(asset, factors, hac)` | Multi-factor OLS: coef, SE, t, p per factor; R² in `attrs` |
+| `dimson_beta(asset, b, lags)` | Beta including lagged benchmark terms (stale or asynchronous prices) |
+| `downside_beta(asset, b)` | Beta in periods when the benchmark falls |
+| `adjust_beta(est, method)` | Blume or Vasicek shrinkage toward 1 |
+
+**Event studies and inference**
+
+| Function | What it computes |
+|---|---|
+| `event_study(asset, b, events, window)` | Market-model abnormal returns, CAR and t-stats around event dates |
+| `probabilistic_sharpe(r, benchmark_sharpe)` | Probability the true Sharpe exceeds a threshold, given skew, tails and sample size |
+| `bootstrap_ci(x, statistic)` | Block-bootstrap confidence interval for any statistic |
+
+**Portfolios**
+
+| Function | What it computes |
+|---|---|
+| `portfolio_returns(r, weights, rebalance)` | Portfolio return series: constant weights, buy-and-hold or periodic rebalancing |
+| `portfolio_vol(weights, cov)` | `sqrt(w' cov w)` |
+| `risk_contributions(weights, cov)` | Marginal and component risk per asset |
+| `diversification_ratio(weights, cov)` | Weighted average vol over portfolio vol |
+| `inverse_vol_weights(cov)` / `min_variance_weights(cov)` / `risk_parity_weights(cov)` | Simple weighting schemes |
+
+**Discovery and output**
+
+| Function | What it does |
+|---|---|
+| `catalog()` / `guide()` | List the API; print the usage guide |
+| `render(result)` / `to_dict(result)` | Text with provenance; JSON-safe data |
 
 **Summary**
 

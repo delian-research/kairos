@@ -29,5 +29,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `vol_percentile`.
 - Covariance: `correlation`, `ewma_cov`, `ledoit_wolf`, `nearest_psd`.
 - `summary`: one-call statistics table with metadata in `df.attrs["kairos"]`.
+- Portfolios: `portfolio_returns` (constant weights, buy-and-hold or periodic
+  rebalancing), `portfolio_vol`, `risk_contributions`,
+  `diversification_ratio`, `inverse_vol_weights`, `min_variance_weights`,
+  `risk_parity_weights`.
+- Regression: `factor_regression` (multi-factor OLS, optional Newey-West),
+  `dimson_beta`, `downside_beta`, `adjust_beta` (Blume, Vasicek).
+- `event_study`: market-model abnormal returns and CAR around event dates.
+- Inference: `probabilistic_sharpe`, `bootstrap_ci` (circular block
+  bootstrap).
+- LLM and agent support: `catalog()`, `guide()` (usage guide shipped in the
+  package), `render()`, `to_dict()` (JSON-safe results).
+- Functions that take returns now raise if the input looks like prices.
 
 [Unreleased]: https://github.com/delian-research/kairos/commits/main

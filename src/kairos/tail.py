@@ -12,7 +12,7 @@ from typing import Any, Literal, cast
 import numpy as np
 import pandas as pd
 
-from ._util import check_level, clean_series, require_n, span
+from ._util import check_level, clean_returns, require_n, span
 from .results import Estimate
 
 VaRMethod = Literal["historical", "normal", "cornish-fisher"]
@@ -50,7 +50,7 @@ def value_at_risk(
       excess kurtosis (Favre and Galeano, 2002).
     """
     level = check_level(level)
-    x = clean_series(r, "r")
+    x = clean_returns(r, "r")
     alpha = 1.0 - level
     if method == "historical":
         require_n(len(x), 2, "value_at_risk")
@@ -82,7 +82,7 @@ def expected_shortfall(
     * ``"normal"``: ``-(mean - std * pdf(z) / (1 - level))``.
     """
     level = check_level(level)
-    x = clean_series(r, "r")
+    x = clean_returns(r, "r")
     require_n(len(x), 2, "expected_shortfall")
     alpha = 1.0 - level
     if method == "historical":
@@ -101,20 +101,20 @@ def expected_shortfall(
 
 def skewness(r: pd.Series) -> Estimate:
     """Sample skewness (adjusted Fisher-Pearson, bias corrected)."""
-    x = clean_series(r, "r")
+    x = clean_returns(r, "r")
     require_n(len(x), 3, "skewness")
     return _est(_moment(x.skew()), x, "skewness", bias_corrected=True)
 
 
 def excess_kurtosis(r: pd.Series) -> Estimate:
     """Sample excess kurtosis (0 for a normal distribution, bias corrected)."""
-    x = clean_series(r, "r")
+    x = clean_returns(r, "r")
     require_n(len(x), 4, "excess_kurtosis")
     return _est(_moment(x.kurt()), x, "excess-kurtosis", bias_corrected=True)
 
 
 def worst_periods(r: pd.Series, n: int = 5) -> pd.Series:
     """The ``n`` lowest returns, worst first, with their dates."""
-    x = clean_series(r, "r")
+    x = clean_returns(r, "r")
     require_n(len(x), n, "worst_periods")
     return x.nsmallest(n)

@@ -7,7 +7,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from ._util import align, require_n, span
+from ._util import align, check_returns, require_n, span
 from .results import Estimate
 
 
@@ -38,6 +38,8 @@ def beta(
     and ``se_type``.
     """
     y, x = align(asset, benchmark)
+    check_returns(y, "asset")
+    check_returns(x, "benchmark")
     n = len(y)
     require_n(n, 3, "beta")
     xv = x.to_numpy()
@@ -83,6 +85,8 @@ def rolling_beta(asset: pd.Series, benchmark: pd.Series, window: int) -> pd.Seri
     """
     require_n(window, 3, "rolling_beta window")
     y, x = align(asset, benchmark)
+    check_returns(y, "asset")
+    check_returns(x, "benchmark")
     cov = y.rolling(window).cov(x)
     var = x.rolling(window).var()
     out = cov / var.replace(0.0, np.nan)

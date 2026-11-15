@@ -7,7 +7,7 @@ from collections.abc import Callable
 
 import pandas as pd
 
-from ._util import align, clean_series, frame_attrs, require_n, rf_label, span
+from ._util import align, clean_returns, frame_attrs, require_n, rf_label, span
 from .beta import beta
 from .conventions import (
     DEFAULT_RETURN_METHOD,
@@ -51,7 +51,7 @@ def _one(
     periods: int,
     level: float,
 ) -> dict[str, float]:
-    x = clean_series(r, "r")
+    x = clean_returns(r, "r")
     require_n(len(x), SUMMARY_MIN_OBS, "summary")
     pct = f"{level * 100:g}"
     row: dict[str, float] = {

@@ -13,7 +13,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-from ._util import align, clean_series, is_zero_scale, require_n, rf_label, span
+from ._util import align, clean_returns, is_zero_scale, require_n, rf_label, span
 from .conventions import (
     DEFAULT_DDOF,
     DEFAULT_RETURN_METHOD,
@@ -60,7 +60,7 @@ def annualized_return(
     a year).
     """
     check_method(method)
-    x = clean_series(r, "r")
+    x = clean_returns(r, "r")
     require_n(len(x), 1, "annualized_return")
     g = _log_growth(x, method)
     value = math.expm1(float(g.sum()) * periods / len(x))
@@ -80,7 +80,7 @@ def sharpe_ratio(
     ``rf`` is a per-period rate (constant or Series). Raises if the excess
     returns have zero volatility.
     """
-    x = excess_returns(clean_series(r, "r"), rf)
+    x = excess_returns(clean_returns(r, "r"), rf)
     require_n(len(x), ddof + 1, "sharpe_ratio")
     sd = float(x.std(ddof=ddof))
     if is_zero_scale(sd, float(x.mean())):
@@ -111,7 +111,7 @@ def sortino_ratio(
     Downside deviation is ``sqrt(mean(min(r - target, 0)^2))`` taken over
     *all* periods (Sortino and Price, 1994), not only the losing ones.
     """
-    x = clean_series(r, "r")
+    x = clean_returns(r, "r")
     require_n(len(x), 2, "sortino_ratio")
     d = x - target
     dd = math.sqrt(float((d.clip(upper=0.0) ** 2).mean()))
@@ -139,10 +139,10 @@ def calmar_ratio(
 ) -> Estimate:
     """CAGR divided by the absolute maximum drawdown over the same data."""
     cagr = annualized_return(r, method, periods=periods)
-    mdd = max_drawdown(clean_series(r, "r"), method)
+    mdd = max_drawdown(clean_returns(r, "r"), method)
     if mdd.value == 0:
         raise ValueError("calmar_ratio is undefined with no drawdown")
-    x = clean_series(r, "r")
+    x = clean_returns(r, "r")
     return _estimate(
         cagr.value / abs(mdd.value),
         x,
@@ -240,6 +240,6 @@ def capture_ratio(
 
 def hit_rate(r: pd.Series, threshold: float = 0.0) -> Estimate:
     """Fraction of periods with a return strictly above ``threshold``."""
-    x = clean_series(r, "r")
+    x = clean_returns(r, "r")
     require_n(len(x), 1, "hit_rate")
     return _estimate(float((x > threshold).mean()), x, "hit-rate", threshold=threshold)

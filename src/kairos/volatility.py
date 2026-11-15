@@ -13,7 +13,7 @@ from typing import cast, overload
 import numpy as np
 import pandas as pd
 
-from ._util import align, clean_series, frame_attrs, require_n, span
+from ._util import align, clean_returns, frame_attrs, require_n, span
 from .conventions import DEFAULT_DDOF, TRADING_DAYS, annualize_vol
 from .results import Estimate
 from .returns import last_n
@@ -62,7 +62,7 @@ def realized_vol(
             )
             for c in r.columns
         }
-    x = clean_series(r, "r")
+    x = clean_returns(r, "r")
     if window is not None:
         x = last_n(x, window)
     require_n(len(x), ddof + 1, "realized_vol")
@@ -112,7 +112,7 @@ def ewma_vol(
     """
     if halflife <= 0:
         raise ValueError(f"halflife must be positive, got {halflife}")
-    x = clean_series(r, "r")
+    x = clean_returns(r, "r")
     require_n(len(x), 2, "ewma_vol")
     var = float((x**2).ewm(halflife=halflife, adjust=True).mean().iloc[-1])
     sigma = math.sqrt(var)
@@ -298,7 +298,7 @@ def vol_cone(
     windows overlap, so the quantiles are descriptive, not independent
     samples. Metadata is in ``df.attrs["kairos"]``.
     """
-    x = clean_series(r, "r")
+    x = clean_returns(r, "r")
     rows = {}
     for w in windows:
         rv = rolling_vol(x, w, ddof=ddof, annualize=annualize, periods=periods)
@@ -329,7 +329,7 @@ def vol_percentile(r: pd.Series, window: int, *, ddof: int = DEFAULT_DDOF) -> Es
     the latest) that are less than or equal to the latest, so 1.0 means
     volatility is at its highest in the sample. ``n`` counts rolling values.
     """
-    x = clean_series(r, "r")
+    x = clean_returns(r, "r")
     rv = rolling_vol(x, window, ddof=ddof).dropna()
     require_n(len(rv), 2, "vol_percentile")
     current = float(rv.iloc[-1])

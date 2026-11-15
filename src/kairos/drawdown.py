@@ -7,7 +7,7 @@ from typing import overload
 import numpy as np
 import pandas as pd
 
-from ._util import clean_series, require_n, span
+from ._util import clean_returns, require_n, span
 from .conventions import DEFAULT_RETURN_METHOD, ReturnMethod, check_method
 from .results import Estimate
 from .returns import cumulative
@@ -22,7 +22,7 @@ def drawdown_series(
     counts as a drawdown.
     """
     check_method(method)
-    x = clean_series(r, "r")
+    x = clean_returns(r, "r")
     wealth = cumulative(x, method)
     peak = wealth.cummax().clip(lower=1.0)
     dd = wealth / peak - 1.0
@@ -47,7 +47,7 @@ def max_drawdown(
     """
     if isinstance(r, pd.DataFrame):
         return {str(c): max_drawdown(r[c], method) for c in r.columns}
-    x = clean_series(r, "r")
+    x = clean_returns(r, "r")
     require_n(len(x), 1, "max_drawdown")
     wealth = cumulative(x, method)
     dd = drawdown_series(x, method)

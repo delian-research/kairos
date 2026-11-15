@@ -26,7 +26,10 @@ from .conventions import (
     annualize_vol,
 )
 from .covariance import correlation, ewma_cov, ledoit_wolf, nearest_psd
+from .describe import catalog, guide, render, to_dict
 from .drawdown import drawdown_series, max_drawdown
+from .events import event_study
+from .inference import bootstrap_ci, probabilistic_sharpe
 from .performance import (
     annualized_return,
     calmar_ratio,
@@ -37,6 +40,16 @@ from .performance import (
     sortino_ratio,
     tracking_error,
 )
+from .portfolio import (
+    diversification_ratio,
+    inverse_vol_weights,
+    min_variance_weights,
+    portfolio_returns,
+    portfolio_vol,
+    risk_contributions,
+    risk_parity_weights,
+)
+from .regression import adjust_beta, dimson_beta, downside_beta, factor_regression
 from .results import Estimate
 from .returns import cumulative, last_n, returns
 from .summary import summary
@@ -78,32 +91,49 @@ __all__ = [
     "ReturnMethod",
     "__version__",
     "active_returns",
+    "adjust_beta",
     "annualize_return",
     "annualize_vol",
     "annualized_return",
     "beta",
+    "bootstrap_ci",
     "calmar_ratio",
     "capture_ratio",
+    "catalog",
     "correlation",
     "cumulative",
+    "dimson_beta",
+    "diversification_ratio",
+    "downside_beta",
     "drawdown_series",
+    "event_study",
     "ewma_cov",
     "ewma_vol",
     "excess_kurtosis",
     "excess_returns",
     "expected_shortfall",
+    "factor_regression",
     "garman_klass_vol",
+    "guide",
     "hit_rate",
     "information_ratio",
+    "inverse_vol_weights",
     "last_n",
     "ledoit_wolf",
     "max_drawdown",
+    "min_variance_weights",
     "nearest_psd",
     "newey_west_lags",
     "parkinson_vol",
+    "portfolio_returns",
+    "portfolio_vol",
+    "probabilistic_sharpe",
     "realized_vol",
+    "render",
     "resample_returns",
     "returns",
+    "risk_contributions",
+    "risk_parity_weights",
     "rogers_satchell_vol",
     "rolling_beta",
     "rolling_vol",
@@ -111,6 +141,7 @@ __all__ = [
     "skewness",
     "sortino_ratio",
     "summary",
+    "to_dict",
     "total_return_prices",
     "tracking_error",
     "value_at_risk",
