@@ -1,0 +1,70 @@
+[project]
+name = "kairos-analytics"
+version = "0.1.0"
+description = "Price analytics with explicit conventions: returns, volatility, beta and drawdown"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "delian research" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+]
+keywords = [
+    "finance",
+    "quant",
+    "volatility",
+    "returns",
+    "beta",
+    "drawdown",
+    "risk",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/delian-research/kairos"
+Repository = "https://github.com/delian-research/kairos"
+Issues = "https://github.com/delian-research/kairos/issues"
+Changelog = "https://github.com/delian-research/kairos/blob/main/CHANGELOG.md"
+
+[build-system]
+requires = ["uv_build>=0.11.3,<0.12.0"]
+build-backend = "uv_build"
+
+# The PyPI distribution is "kairos-analytics" (the name "kairos" is taken on
+# PyPI), but the importable module is "kairos".
+[tool.uv.build-backend]
+module-name = "kairos"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.1.0",
+    "pandas-stubs>=2.0",
+    "pytest>=9.0.3",
+    "ruff>=0.15.13",
+]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_unused_configs = true
