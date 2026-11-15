@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import overload
 
+import numpy as np
 import pandas as pd
 
 from ._util import clean_series, require_n, span
@@ -50,19 +51,22 @@ def max_drawdown(
     require_n(len(x), 1, "max_drawdown")
     wealth = cumulative(x, method)
     dd = drawdown_series(x, method)
-    trough = dd.idxmin()
-    value = float(dd.loc[trough])
+    # Work positionally: label-based .loc is ambiguous with duplicate index
+    # labels and does not type-check against an idxmin() Hashable.
+    pos = int(np.argmin(dd.to_numpy()))
+    trough = dd.index[pos]
+    value = float(dd.iloc[pos])
 
     peak = None
     recovery = None
     if value < 0:
-        before = wealth.loc[:trough]
+        before = wealth.iloc[: pos + 1]
         if before.max() >= 1.0:
-            peak = before.idxmax()
+            peak = before.index[int(np.argmax(before.to_numpy()))]
             peak_level = float(before.max())
         else:
             peak_level = 1.0
-        after = wealth.loc[trough:]
+        after = wealth.iloc[pos:]
         recovered = after[after >= peak_level]
         if len(recovered):
             recovery = recovered.index[0]
