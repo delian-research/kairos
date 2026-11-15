@@ -92,3 +92,47 @@ def test_range_estimators_recover_sigma(rng) -> None:
 def test_range_estimators_validate() -> None:
     with pytest.raises(ValueError):
         k.parkinson_vol(pd.Series([1.0]), pd.Series([2.0]))
+
+
+def _ohlc_with_gaps(rng, n, sigma, steps=390, gap_sigma=0.0):
+    """Daily OHLC from an intraday random walk with optional overnight gaps."""
+    s = sigma / np.sqrt(steps)
+    rows = []
+    prev_close = 100.0
+    for _ in range(n):
+        o = prev_close * np.exp(rng.normal(0, gap_sigma)) if gap_sigma else prev_close
+        path = o * np.exp(np.cumsum(rng.normal(-0.5 * s * s, s, steps)))
+        path = np.concatenate([[o], path])
+        rows.append((o, path.max(), path.min(), path[-1]))
+        prev_close = path[-1]
+    df = pd.DataFrame(rows, columns=["open", "high", "low", "close"])
+    df.index = pd.bdate_range("2020-01-01", periods=n)
+    return df
+
+
+def test_rogers_satchell_recovers_sigma(rng):
+    df = _ohlc_with_gaps(rng, 400, 0.01)
+    est = k.rogers_satchell_vol(df.open, df.high, df.low, df.close)
+    assert est.value == pytest.approx(0.01, rel=0.08)
+
+
+def test_yang_zhang_includes_gaps(rng):
+    df = _ohlc_with_gaps(rng, 600, 0.01, gap_sigma=0.01)
+    yz = k.yang_zhang_vol(df.open, df.high, df.low, df.close)
+    gk = k.garman_klass_vol(df.open, df.high, df.low, df.close)
+    total = np.sqrt(0.01**2 + 0.01**2)
+    assert yz.value == pytest.approx(total, rel=0.08)
+    assert gk.value < 0.8 * total
+    assert yz.n == 599
+
+
+def test_vol_cone_and_percentile(dates, rng):
+    r = pd.Series(rng.normal(0, 0.01, len(dates)), index=dates)
+    cone = k.vol_cone(r, (21, 63))
+    assert list(cone.index) == [21, 63]
+    assert cone.loc[21, "current"] == pytest.approx(k.rolling_vol(r, 21).iloc[-1])
+    assert (cone["q0"] <= cone["q0.5"]).all() and (cone["q0.5"] <= cone["q1"]).all()
+    spiked = r.copy()
+    spiked.iloc[-21:] *= 5  # latest window is the most volatile in the sample
+    assert k.vol_percentile(spiked, 21).value == 1.0
+    assert 0.0 < k.vol_percentile(r, 21).value <= 1.0

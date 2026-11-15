@@ -8,12 +8,12 @@ the returned :class:`~kairos.results.Estimate`.
 from __future__ import annotations
 
 import math
-from typing import overload
+from typing import cast, overload
 
 import numpy as np
 import pandas as pd
 
-from ._util import align, clean_series, require_n, span
+from ._util import align, clean_series, frame_attrs, require_n, span
 from .conventions import DEFAULT_DDOF, TRADING_DAYS, annualize_vol
 from .results import Estimate
 from .returns import last_n
@@ -166,6 +166,42 @@ def parkinson_vol(
     )
 
 
+def _ohlc(
+    open_: pd.Series, high: pd.Series, low: pd.Series, close: pd.Series
+) -> pd.DataFrame:
+    df = pd.concat(
+        [x.astype(float) for x in (open_, high, low, close)],
+        axis=1,
+        join="inner",
+        keys=["open", "high", "low", "close"],
+    ).dropna()
+    if (df <= 0).to_numpy().any() or (df["high"] < df["low"]).any():
+        raise ValueError("need positive prices and low <= high on every row")
+    return df
+
+
+def _range_estimate(
+    var: float,
+    df: pd.DataFrame,
+    method: str,
+    annualize: bool,
+    periods: int,
+    **extra: object,
+) -> Estimate:
+    sigma = math.sqrt(max(var, 0.0))
+    if annualize:
+        sigma = annualize_vol(sigma, periods)
+    start, end = span(df.index)
+    return Estimate(
+        value=sigma,
+        n=len(df),
+        start=start,
+        end=end,
+        method=method,
+        params={"annualized": annualize, "periods": periods, **extra},
+    )
+
+
 def garman_klass_vol(
     open_: pd.Series,
     high: pd.Series,
@@ -181,30 +217,128 @@ def garman_klass_vol(
     Parkinson, it measures intraday variation only and excludes the
     close-to-open gap.
     """
-    df = pd.concat(
-        [
-            open_.astype(float),
-            high.astype(float),
-            low.astype(float),
-            close.astype(float),
-        ],
-        axis=1,
-        join="inner",
-    ).dropna()
+    df = _ohlc(open_, high, low, close)
     require_n(len(df), 1, "garman_klass_vol")
-    o, h, lo, c = (df.iloc[:, i] for i in range(4))
-    if (df <= 0).to_numpy().any() or (h < lo).any():
-        raise ValueError("need positive prices and low <= high on every row")
+    o, h, lo, c = (df[k] for k in ("open", "high", "low", "close"))
     term = 0.5 * np.log(h / lo) ** 2 - (2.0 * math.log(2.0) - 1.0) * np.log(c / o) ** 2
-    sigma = math.sqrt(max(float(term.mean()), 0.0))
-    if annualize:
-        sigma = annualize_vol(sigma, periods)
-    start, end = span(df.index)
-    return Estimate(
-        value=sigma,
-        n=len(df),
+    return _range_estimate(float(term.mean()), df, "garman-klass", annualize, periods)
+
+
+def _rs_terms(df: pd.DataFrame) -> pd.Series:
+    o, h, lo, c = (df[k] for k in ("open", "high", "low", "close"))
+    return np.log(h / c) * np.log(h / o) + np.log(lo / c) * np.log(lo / o)
+
+
+def rogers_satchell_vol(
+    open_: pd.Series,
+    high: pd.Series,
+    low: pd.Series,
+    close: pd.Series,
+    *,
+    annualize: bool = False,
+    periods: int = TRADING_DAYS,
+) -> Estimate:
+    """Rogers-Satchell (1991) OHLC estimator.
+
+    ``sigma^2 = mean(ln(H/C) ln(H/O) + ln(L/C) ln(L/O))``. Unlike Parkinson and
+    Garman-Klass it stays unbiased when prices drift, but it still ignores
+    overnight gaps.
+    """
+    df = _ohlc(open_, high, low, close)
+    require_n(len(df), 1, "rogers_satchell_vol")
+    var = float(_rs_terms(df).mean())
+    return _range_estimate(var, df, "rogers-satchell", annualize, periods)
+
+
+def yang_zhang_vol(
+    open_: pd.Series,
+    high: pd.Series,
+    low: pd.Series,
+    close: pd.Series,
+    *,
+    annualize: bool = False,
+    periods: int = TRADING_DAYS,
+) -> Estimate:
+    """Yang-Zhang (2000) estimator, which includes overnight gaps.
+
+    ``sigma^2 = var(overnight) + k var(open-to-close) + (1 - k) RS`` with
+    ``k = 0.34 / (1.34 + (n + 1) / (n - 1))``, where overnight is
+    ``ln(O_t / C_{t-1})`` and RS is the Rogers-Satchell variance. The first
+    row only supplies a previous close, so ``n`` is one less than the number
+    of rows.
+    """
+    df = _ohlc(open_, high, low, close)
+    overnight = cast(pd.Series, np.log(df["open"] / df["close"].shift(1))).iloc[1:]
+    body = df.iloc[1:]
+    n = len(body)
+    require_n(n, 2, "yang_zhang_vol")
+    intraday = np.log(body["close"] / body["open"])
+    k = 0.34 / (1.34 + (n + 1) / (n - 1))
+    var = (
+        float(overnight.var(ddof=1))
+        + k * float(intraday.var(ddof=1))
+        + (1.0 - k) * float(_rs_terms(body).mean())
+    )
+    return _range_estimate(var, body, "yang-zhang", annualize, periods, k=k)
+
+
+def vol_cone(
+    r: pd.Series,
+    windows: tuple[int, ...] = (21, 63, 126, 252),
+    *,
+    quantiles: tuple[float, ...] = (0.0, 0.25, 0.5, 0.75, 1.0),
+    ddof: int = DEFAULT_DDOF,
+    annualize: bool = False,
+    periods: int = TRADING_DAYS,
+) -> pd.DataFrame:
+    """Distribution of rolling volatility for several window lengths.
+
+    One row per window; columns are the requested quantiles of that window's
+    rolling volatility history plus ``current`` (the latest value). Rolling
+    windows overlap, so the quantiles are descriptive, not independent
+    samples. Metadata is in ``df.attrs["kairos"]``.
+    """
+    x = clean_series(r, "r")
+    rows = {}
+    for w in windows:
+        rv = rolling_vol(x, w, ddof=ddof, annualize=annualize, periods=periods)
+        rv = rv.dropna()
+        require_n(len(rv), 1, f"vol_cone window {w}")
+        row = {f"q{q:g}": float(rv.quantile(q)) for q in quantiles}
+        row["current"] = float(rv.iloc[-1])
+        rows[w] = row
+    out = pd.DataFrame.from_dict(rows, orient="index")
+    out.index.name = "window"
+    start, end = span(x.index)
+    return frame_attrs(
+        out,
+        method="vol-cone",
+        n=len(x),
         start=start,
         end=end,
-        method="garman-klass",
-        params={"annualized": annualize, "periods": periods},
+        ddof=ddof,
+        annualized=annualize,
+        periods=periods,
+    )
+
+
+def vol_percentile(r: pd.Series, window: int, *, ddof: int = DEFAULT_DDOF) -> Estimate:
+    """Where the latest ``window``-period volatility sits in its own history.
+
+    The value is the fraction of rolling-volatility observations (including
+    the latest) that are less than or equal to the latest, so 1.0 means
+    volatility is at its highest in the sample. ``n`` counts rolling values.
+    """
+    x = clean_series(r, "r")
+    rv = rolling_vol(x, window, ddof=ddof).dropna()
+    require_n(len(rv), 2, "vol_percentile")
+    current = float(rv.iloc[-1])
+    start, end = span(rv.index)
+    return Estimate(
+        value=float((rv <= current).mean()),
+        n=len(rv),
+        start=start,
+        end=end,
+        method="vol-percentile",
+        params={"window": window, "ddof": ddof, "current_vol": current},
     )

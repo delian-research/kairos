@@ -25,15 +25,44 @@ from .conventions import (
     annualize_return,
     annualize_vol,
 )
+from .covariance import correlation, ewma_cov, ledoit_wolf, nearest_psd
 from .drawdown import drawdown_series, max_drawdown
+from .performance import (
+    annualized_return,
+    calmar_ratio,
+    capture_ratio,
+    hit_rate,
+    information_ratio,
+    sharpe_ratio,
+    sortino_ratio,
+    tracking_error,
+)
 from .results import Estimate
 from .returns import cumulative, last_n, returns
+from .summary import summary
+from .tail import (
+    excess_kurtosis,
+    expected_shortfall,
+    skewness,
+    value_at_risk,
+    worst_periods,
+)
+from .transforms import (
+    active_returns,
+    excess_returns,
+    resample_returns,
+    total_return_prices,
+)
 from .volatility import (
     ewma_vol,
     garman_klass_vol,
     parkinson_vol,
     realized_vol,
+    rogers_satchell_vol,
     rolling_vol,
+    vol_cone,
+    vol_percentile,
+    yang_zhang_vol,
 )
 
 try:
@@ -48,19 +77,45 @@ __all__ = [
     "Estimate",
     "ReturnMethod",
     "__version__",
+    "active_returns",
     "annualize_return",
     "annualize_vol",
+    "annualized_return",
     "beta",
+    "calmar_ratio",
+    "capture_ratio",
+    "correlation",
     "cumulative",
     "drawdown_series",
+    "ewma_cov",
     "ewma_vol",
+    "excess_kurtosis",
+    "excess_returns",
+    "expected_shortfall",
     "garman_klass_vol",
+    "hit_rate",
+    "information_ratio",
     "last_n",
+    "ledoit_wolf",
     "max_drawdown",
+    "nearest_psd",
     "newey_west_lags",
     "parkinson_vol",
     "realized_vol",
+    "resample_returns",
     "returns",
+    "rogers_satchell_vol",
     "rolling_beta",
     "rolling_vol",
+    "sharpe_ratio",
+    "skewness",
+    "sortino_ratio",
+    "summary",
+    "total_return_prices",
+    "tracking_error",
+    "value_at_risk",
+    "vol_cone",
+    "vol_percentile",
+    "worst_periods",
+    "yang_zhang_vol",
 ]

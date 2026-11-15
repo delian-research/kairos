@@ -18,5 +18,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Drawdown: `drawdown_series`, `max_drawdown`.
 - Conventions module: `TRADING_DAYS`, `DEFAULT_RETURN_METHOD`, `DEFAULT_DDOF`,
   `annualize_vol`, `annualize_return`.
+- Transforms: `excess_returns`, `active_returns`, `resample_returns`,
+  `total_return_prices`.
+- Performance: `annualized_return` (CAGR), `sharpe_ratio`, `sortino_ratio`,
+  `calmar_ratio`, `tracking_error`, `information_ratio`, `capture_ratio`,
+  `hit_rate`.
+- Tail risk: `value_at_risk` (historical, normal, Cornish-Fisher),
+  `expected_shortfall`, `skewness`, `excess_kurtosis`, `worst_periods`.
+- Volatility: `rogers_satchell_vol`, `yang_zhang_vol`, `vol_cone`,
+  `vol_percentile`.
+- Covariance: `correlation`, `ewma_cov`, `ledoit_wolf`, `nearest_psd`.
+- `summary`: one-call statistics table with metadata in `df.attrs["kairos"]`.
 
 [Unreleased]: https://github.com/delian-research/kairos/commits/main

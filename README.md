@@ -1,7 +1,7 @@
 # Kairos
 
 Kairos is a small Python package for price analytics: returns, volatility,
-beta and drawdown. Every result says how it was computed, so the conventions
+beta, drawdown, performance ratios, tail risk and covariance. Every result says how it was computed, so the conventions
 behind a number are never ambiguous.
 
 ## Installation
@@ -38,20 +38,28 @@ a shorter window than you asked for.
 ```python
 import kairos as k
 
-r = k.returns(prices)                  # log returns; n prices -> n - 1 returns
-r = k.last_n(r, 252)                   # exactly the latest 252 returns
+r = k.returns(prices)  # log returns; n prices -> n - 1 returns
+r = k.last_n(r, 252)  # exactly the latest 252 returns
 
 vol = k.realized_vol(r, annualize=True)
 print(vol)
 # 0.137384 (close-to-close, n=252, 2025-11-13 to 2026-11-13; ddof=1, annualized=True, periods=252)
 
 vol.value, vol.n, vol.start, vol.params["ddof"]
+
+k.summary(r, benchmark=spy_r, rf=0.04 / 252)  # full stats table, one column per asset
 ```
 
 Every scalar function returns an `Estimate` with `value`, `n`, `start`, `end`,
 `method` and `params`. `Estimate.as_dict()` flattens it for DataFrames or JSON.
 Passing a DataFrame (one column per instrument) to `realized_vol` or
-`max_drawdown` returns a `dict[str, Estimate]`.
+`max_drawdown` returns a `dict[str, Estimate]`. Table results (`summary`,
+`vol_cone`, correlation and covariance matrices) are DataFrames with the same
+metadata in `df.attrs["kairos"]`.
+
+Ratios such as Sharpe are per period unless `annualize=True`; `summary`
+annualizes them and says so in its metadata. Risk-free rates are per period
+(`0.04 / 252`, or a Series). VaR and expected shortfall are positive losses.
 
 ## API
 
@@ -69,9 +77,62 @@ Passing a DataFrame (one column per instrument) to `realized_vol` or
 | `rolling_beta(asset, benchmark, window)` | Rolling OLS beta |
 | `drawdown_series(r)` / `max_drawdown(r)` | Drawdown path; worst drawdown with peak, trough and recovery dates |
 
-Range estimators (Parkinson, Garman-Klass) measure intraday variation only and
-ignore overnight gaps, so they tend to read lower than close-to-close
-volatility for instruments that gap.
+**Transforms**
+
+| Function | What it computes |
+|---|---|
+| `excess_returns(r, rf)` | Returns minus a per-period risk-free rate (constant or Series) |
+| `active_returns(r, benchmark)` | Asset minus benchmark |
+| `resample_returns(r, freq, method)` | Lower-frequency returns: sums log, compounds simple |
+| `total_return_prices(close, dividends)` | Dividend-adjusted prices from cash dividends by ex-date |
+
+**Performance**
+
+| Function | What it computes |
+|---|---|
+| `annualized_return(r, method)` | CAGR, as a simple annual rate |
+| `sharpe_ratio(r, rf)` / `sortino_ratio(r, target)` | Mean excess return over std / downside deviation |
+| `calmar_ratio(r)` | CAGR over absolute max drawdown |
+| `tracking_error(r, b)` / `information_ratio(r, b)` | Std of active returns / mean active over tracking error |
+| `capture_ratio(r, b, side)` | Up- or down-market capture (geometric means) |
+| `hit_rate(r)` | Fraction of positive periods |
+
+**Tail risk**
+
+| Function | What it computes |
+|---|---|
+| `value_at_risk(r, level, method)` | Historical, normal or Cornish-Fisher VaR |
+| `expected_shortfall(r, level, method)` | Historical or normal expected shortfall (CVaR) |
+| `skewness(r)` / `excess_kurtosis(r)` | Bias-corrected sample moments |
+| `worst_periods(r, n)` | The `n` worst returns with dates |
+
+**More volatility**
+
+| Function | What it computes |
+|---|---|
+| `rogers_satchell_vol(o, h, l, c)` | Drift-robust OHLC estimator |
+| `yang_zhang_vol(o, h, l, c)` | OHLC estimator that includes overnight gaps |
+| `vol_cone(r, windows)` | Quantiles of rolling vol by window, plus current |
+| `vol_percentile(r, window)` | Where current rolling vol sits in its history |
+
+**Correlation and covariance**
+
+| Function | What it computes |
+|---|---|
+| `correlation(r, min_obs)` | Pairwise correlation with a minimum-overlap threshold |
+| `ewma_cov(r, halflife)` | Exponentially weighted covariance (RiskMetrics) |
+| `ledoit_wolf(r)` | Shrinkage covariance; intensity in `attrs` |
+| `nearest_psd(cov)` | Eigenvalue-clipping repair of a non-PSD matrix |
+
+**Summary**
+
+| Function | What it computes |
+|---|---|
+| `summary(r, benchmark, rf)` | Return, vol, ratios, drawdown, tail and benchmark stats in one table |
+
+Parkinson, Garman-Klass and Rogers-Satchell measure intraday variation only
+and ignore overnight gaps, so they tend to read lower than close-to-close
+volatility for instruments that gap. Yang-Zhang adds the overnight component.
 
 ## Development
 
