@@ -141,6 +141,8 @@ annualizes them and says so in its metadata. Risk-free rates are per period
 | Function | What it computes |
 |---|---|
 | `correlation(r, min_obs)` | Pairwise correlation with a minimum-overlap threshold |
+| `pair_correlation(a, b, controls)` | Correlation of two series with a confidence interval; partial correlation with controls |
+| `rolling_correlation(a, b, window)` | Rolling correlation of two series |
 | `ewma_cov(r, halflife)` | Exponentially weighted covariance (RiskMetrics) |
 | `ledoit_wolf(r)` | Shrinkage covariance; intensity in `attrs` |
 | `nearest_psd(cov)` | Eigenvalue-clipping repair of a non-PSD matrix |
@@ -153,6 +155,7 @@ annualizes them and says so in its metadata. Risk-free rates are per period
 | `dimson_beta(asset, b, lags)` | Beta including lagged benchmark terms (stale or asynchronous prices) |
 | `downside_beta(asset, b)` | Beta in periods when the benchmark falls |
 | `adjust_beta(est, method)` | Blume or Vasicek shrinkage toward 1 |
+| `residual_returns(asset, factors)` | Returns with factor exposure removed (e.g. market-neutral) |
 
 **Event studies and inference**
 
@@ -160,7 +163,7 @@ annualizes them and says so in its metadata. Risk-free rates are per period
 |---|---|
 | `event_study(asset, b, events, window)` | Market-model abnormal returns, CAR and t-stats around event dates |
 | `probabilistic_sharpe(r, benchmark_sharpe)` | Probability the true Sharpe exceeds a threshold, given skew, tails and sample size |
-| `bootstrap_ci(x, statistic)` | Block-bootstrap confidence interval for any statistic |
+| `bootstrap_ci(x, statistic)` | Block-bootstrap confidence interval for any statistic of one series or several |
 
 **Portfolios**
 

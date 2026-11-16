@@ -6,12 +6,16 @@ Matrix results are DataFrames that carry their settings in
 
 from __future__ import annotations
 
+import math
+from statistics import NormalDist
 from typing import Literal, TypeVar
 
 import numpy as np
 import pandas as pd
 
-from ._util import frame_attrs, require_n, span
+from ._util import align, check_level, check_returns, frame_attrs, require_n, span
+from .regression import residual_returns
+from .results import Estimate
 
 MatrixT = TypeVar("MatrixT", pd.DataFrame, np.ndarray)
 
@@ -45,6 +49,97 @@ def correlation(
         end=end,
         pair_n=pair_n,
     )
+
+
+def _corr(x: pd.Series, y: pd.Series) -> float:
+    """Pearson correlation that raises, instead of warning and returning NaN,
+    when either series is constant."""
+    if float(np.ptp(x.to_numpy())) == 0.0 or float(np.ptp(y.to_numpy())) == 0.0:
+        raise ValueError("correlation is undefined: a series is constant")
+    return float(x.corr(y))
+
+
+def pair_correlation(
+    a: pd.Series,
+    b: pd.Series,
+    *,
+    controls: pd.Series | pd.DataFrame | None = None,
+    level: float = 0.95,
+) -> Estimate:
+    """Pearson correlation between two return series, with a confidence
+    interval and optional controls.
+
+    With ``controls`` (e.g. the market's returns) this is the **partial
+    correlation**: both series are first regressed on the controls and the
+    residuals are correlated. Two stocks with high market betas look
+    correlated even when nothing links them directly; controlling for the
+    market isolates the relationship specific to the pair.
+
+    ``params`` hold ``lower`` and ``upper`` (Fisher z interval at ``level``)
+    and, with controls, ``raw_correlation``. The Fisher interval assumes
+    independent observations; for daily returns
+    ``kairos.bootstrap_ci(r[[x, y]], lambda d: d[x].corr(d[y]))`` is more
+    robust.
+    """
+    level = check_level(level)
+    names: list[str] = []
+    raw: float | None = None
+    if controls is None:
+        x, y = align(a, b)
+    else:
+        c = controls.to_frame() if isinstance(controls, pd.Series) else controls
+        names = [str(n) for n in c.columns]
+        df = pd.concat(
+            [a.astype(float).rename("__a__"), b.astype(float).rename("__b__"), c],
+            axis=1,
+            join="inner",
+        ).dropna()
+        raw = _corr(df["__a__"], df["__b__"])
+        ctl = df.iloc[:, 2:]
+        x = residual_returns(df["__a__"], ctl)
+        y = residual_returns(df["__b__"], ctl)
+    check_returns(x, "a")
+    check_returns(y, "b")
+    n = len(x)
+    dof = n - 3 - len(names)
+    require_n(dof, 1, "pair_correlation (observations beyond 3 + controls)")
+    rho = _corr(x, y)
+    if abs(rho) >= 1.0:
+        lower = upper = rho
+    else:
+        z = math.atanh(rho)
+        half = NormalDist().inv_cdf(0.5 + level / 2.0) / math.sqrt(dof)
+        lower, upper = math.tanh(z - half), math.tanh(z + half)
+    params: dict[str, object] = {
+        "lower": lower,
+        "upper": upper,
+        "level": level,
+        "interval": "fisher-z",
+    }
+    if controls is not None:
+        params.update({"controls": names, "raw_correlation": raw})
+    start, end = span(x.index)
+    return Estimate(
+        value=rho,
+        n=n,
+        start=start,
+        end=end,
+        method="partial-correlation" if names else "correlation-pearson",
+        params=params,
+    )
+
+
+def rolling_correlation(a: pd.Series, b: pd.Series, window: int) -> pd.Series:
+    """Rolling Pearson correlation of two return series over ``window``
+    periods. The first ``window - 1`` values are NaN."""
+    x, y = align(a, b)
+    check_returns(x, "a")
+    check_returns(y, "b")
+    require_n(window, 3, "rolling_correlation window")
+    require_n(len(x), window, "rolling_correlation")
+    out = x.rolling(window).corr(y)
+    out.name = "rolling_correlation"
+    return out
 
 
 def ewma_cov(r: pd.DataFrame, halflife: float, *, demean: bool = False) -> pd.DataFrame:

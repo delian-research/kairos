@@ -6,7 +6,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 from statistics import NormalDist
-from typing import SupportsFloat, cast
+from typing import Any, SupportsFloat, cast
 
 import numpy as np
 import pandas as pd
@@ -73,8 +73,8 @@ def probabilistic_sharpe(
 
 
 def bootstrap_ci(
-    x: pd.Series,
-    statistic: Callable[[pd.Series], SupportsFloat],
+    x: pd.Series | pd.DataFrame,
+    statistic: Callable[[Any], SupportsFloat],
     *,
     level: float = 0.95,
     n_boot: int = 1000,
@@ -89,9 +89,12 @@ def bootstrap_ci(
     percentile interval.
 
     Args:
-        x: The data, usually returns.
-        statistic: Function of a Series returning a number or an
-            :class:`Estimate`, e.g. ``lambda s: kairos.sharpe_ratio(s)``.
+        x: The data, usually returns. Pass a DataFrame for statistics of
+            several series (correlation, beta): whole rows are resampled
+            together, so the series stay aligned.
+        statistic: Function of the data (same type as ``x``) returning a
+            number or an :class:`Estimate`, e.g. ``kairos.sharpe_ratio`` or
+            ``lambda d: d["a"].corr(d["b"])``.
         level: Confidence level of the interval.
         n_boot: Number of resamples.
         block: Block length. ``None`` uses ``round(n ** (1/3))``; 1 gives the
@@ -103,7 +106,11 @@ def bootstrap_ci(
     across resamples).
     """
     level = check_level(level)
-    s = clean_series(x, "x")
+    s: pd.Series | pd.DataFrame
+    if isinstance(x, pd.DataFrame):
+        s = x.astype(float).dropna()
+    else:
+        s = clean_series(x, "x")
     n = len(s)
     require_n(n, 2, "bootstrap_ci")
     if n_boot < 100:
@@ -120,7 +127,12 @@ def bootstrap_ci(
     for i in range(n_boot):
         starts = rng.integers(0, n, n_blocks)
         idx = ((starts[:, None] + within) % n).ravel()[:n]
-        stats[i] = float(statistic(pd.Series(vals[idx], index=s.index)))
+        sample: pd.Series | pd.DataFrame
+        if isinstance(s, pd.DataFrame):
+            sample = pd.DataFrame(vals[idx], index=s.index, columns=s.columns)
+        else:
+            sample = pd.Series(vals[idx], index=s.index, name=s.name)
+        stats[i] = float(statistic(sample))
     if not np.isfinite(stats).all():
         raise ValueError("statistic returned NaN or infinity on a resample")
     tail = (1.0 - level) / 2.0

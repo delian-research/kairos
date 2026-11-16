@@ -76,3 +76,17 @@ def test_adjust_beta(factors, rng):
     assert 1.0 < vas.value < b.value
     with pytest.raises(ValueError, match="prior_sd"):
         k.adjust_beta(b, "vasicek")
+
+
+def test_residual_returns(factors, rng):
+    e = pd.Series(rng.normal(0, 0.002, len(factors)), index=factors.index)
+    y = (0.001 + 1.2 * factors["mkt"] - 0.5 * factors["smb"] + e).rename("y")
+    res = k.residual_returns(y, factors)
+    assert res.name == "y" and len(res) == len(factors)
+    assert res.mean() == pytest.approx(0.0, abs=1e-12)
+    assert abs(res.corr(factors["mkt"])) < 1e-10
+    assert res.corr(e) > 0.99
+    meta = res.attrs["kairos"]
+    reg = k.factor_regression(y, factors)
+    assert meta["betas"]["mkt"] == pytest.approx(reg.loc["mkt", "coef"])
+    assert meta["alpha"] == pytest.approx(reg.loc["alpha", "coef"])

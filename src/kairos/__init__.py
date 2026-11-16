@@ -25,7 +25,14 @@ from .conventions import (
     annualize_return,
     annualize_vol,
 )
-from .covariance import correlation, ewma_cov, ledoit_wolf, nearest_psd
+from .covariance import (
+    correlation,
+    ewma_cov,
+    ledoit_wolf,
+    nearest_psd,
+    pair_correlation,
+    rolling_correlation,
+)
 from .describe import catalog, guide, render, to_dict
 from .drawdown import drawdown_series, max_drawdown
 from .events import event_study
@@ -49,7 +56,13 @@ from .portfolio import (
     risk_contributions,
     risk_parity_weights,
 )
-from .regression import adjust_beta, dimson_beta, downside_beta, factor_regression
+from .regression import (
+    adjust_beta,
+    dimson_beta,
+    downside_beta,
+    factor_regression,
+    residual_returns,
+)
 from .results import Estimate
 from .returns import cumulative, last_n, returns
 from .summary import summary
@@ -123,6 +136,7 @@ __all__ = [
     "max_drawdown",
     "min_variance_weights",
     "nearest_psd",
+    "pair_correlation",
     "newey_west_lags",
     "parkinson_vol",
     "portfolio_returns",
@@ -130,12 +144,14 @@ __all__ = [
     "probabilistic_sharpe",
     "realized_vol",
     "render",
+    "residual_returns",
     "resample_returns",
     "returns",
     "risk_contributions",
     "risk_parity_weights",
     "rogers_satchell_vol",
     "rolling_beta",
+    "rolling_correlation",
     "rolling_vol",
     "sharpe_ratio",
     "skewness",

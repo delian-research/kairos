@@ -40,6 +40,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   bootstrap).
 - LLM and agent support: `catalog()`, `guide()` (usage guide shipped in the
   package), `render()`, `to_dict()` (JSON-safe results).
+- Pair analysis: `pair_correlation` (confidence interval, optional partial
+  correlation with controls), `rolling_correlation`, `residual_returns`.
+  `bootstrap_ci` accepts a DataFrame and resamples rows together.
 - Functions that take returns now raise if the input looks like prices.
 
 [Unreleased]: https://github.com/delian-research/kairos/commits/main

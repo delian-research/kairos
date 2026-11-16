@@ -23,6 +23,41 @@ from .results import Estimate
 _N = NormalDist()
 
 
+def _fit(
+    asset: pd.Series, factors: pd.DataFrame | pd.Series, what: str
+) -> tuple[pd.DataFrame, list[str], np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Align, validate and solve OLS with an intercept.
+
+    Returns the aligned frame, factor names, design matrix, coefficients,
+    residuals and ``inv(X'X)``.
+    """
+    if not isinstance(asset, pd.Series):
+        raise TypeError("asset must be a pandas Series of returns")
+    f = factors.to_frame() if isinstance(factors, pd.Series) else factors
+    names = [str(c) for c in f.columns]
+    if "alpha" in names or len(set(names)) != len(names):
+        raise ValueError("factor names must be unique and not 'alpha'")
+    df = pd.concat(
+        [asset.astype(float).rename("__y__"), f.astype(float)], axis=1, join="inner"
+    ).dropna()
+    n, k = len(df), len(names)
+    require_n(n, k + 2, what)
+    y = df.iloc[:, 0]
+    check_returns(y, "asset")
+    yv = y.to_numpy()
+    x = np.column_stack([np.ones(n), df.iloc[:, 1:].to_numpy()])
+
+    # inv() "succeeds" on nearly singular matrices and returns garbage, so
+    # test the rank explicitly.
+    if np.linalg.matrix_rank(x) < k + 1:
+        raise ValueError("factors are perfectly collinear (or one is constant)")
+    bread = np.linalg.inv(np.dot(x.T, x))
+    coef = np.dot(bread, np.dot(x.T, yv))
+    u = yv - np.dot(x, coef)
+
+    return df, names, x, coef, u, bread
+
+
 def factor_regression(
     asset: pd.Series,
     factors: pd.DataFrame | pd.Series,
@@ -41,29 +76,9 @@ def factor_regression(
     ``adj_r2``, ``resid_vol`` (per-period standard deviation of residuals),
     ``se_type`` and ``lags``.
     """
-    if not isinstance(asset, pd.Series):
-        raise TypeError("asset must be a pandas Series of returns")
-    f = factors.to_frame() if isinstance(factors, pd.Series) else factors
-    names = [str(c) for c in f.columns]
-    if "alpha" in names or len(set(names)) != len(names):
-        raise ValueError("factor names must be unique and not 'alpha'")
-    df = pd.concat(
-        [asset.astype(float).rename("__y__"), f.astype(float)], axis=1, join="inner"
-    ).dropna()
+    df, names, x, coef, u, bread = _fit(asset, factors, "factor_regression")
     n, k = len(df), len(names)
-    require_n(n, k + 2, "factor_regression")
-    y = df.iloc[:, 0]
-    check_returns(y, "asset")
-    yv = y.to_numpy()
-    x = np.column_stack([np.ones(n), df.iloc[:, 1:].to_numpy()])
-
-    # inv() "succeeds" on nearly singular matrices and returns garbage, so
-    # test the rank explicitly.
-    if np.linalg.matrix_rank(x) < k + 1:
-        raise ValueError("factors are perfectly collinear (or one is constant)")
-    bread = np.linalg.inv(np.dot(x.T, x))
-    coef = np.dot(bread, np.dot(x.T, yv))
-    u = yv - np.dot(x, coef)
+    yv = df.iloc[:, 0].to_numpy()
     ssr = float(np.dot(u, u))
     dof = n - k - 1
 
@@ -106,6 +121,29 @@ def factor_regression(
         lags=used_lags,
         p_value="normal-approximation",
     )
+
+
+def residual_returns(asset: pd.Series, factors: pd.DataFrame | pd.Series) -> pd.Series:
+    """The part of an asset's returns not explained by the factors.
+
+    Residuals from ``asset = alpha + sum_k beta_k * factor_k + e``. They
+    average zero (the intercept is removed) and are uncorrelated with every
+    factor in sample. Use them to study what is specific to the asset, e.g.
+    market-neutral returns with the market as the single factor. The fitted
+    ``alpha`` and ``betas`` are in ``result.attrs["kairos"]``.
+    """
+    df, names, _, coef, u, _ = _fit(asset, factors, "residual_returns")
+    out = pd.Series(u, index=df.index, name=asset.name)
+    start, end = span(df.index)
+    out.attrs["kairos"] = {
+        "method": "residual-returns",
+        "n": len(df),
+        "start": start,
+        "end": end,
+        "alpha": float(coef[0]),
+        "betas": {name: float(c) for name, c in zip(names, coef[1:], strict=True)},
+    }
+    return out
 
 
 def dimson_beta(asset: pd.Series, benchmark: pd.Series, lags: int = 1) -> Estimate:

@@ -53,3 +53,17 @@ def test_block_bootstrap_widens_interval_for_autocorrelated_data(rng):
     iid = k.bootstrap_ci(s, lambda v: v.mean(), block=1, seed=3)
     blocked = k.bootstrap_ci(s, lambda v: v.mean(), block=50, seed=3)
     assert blocked.params["se"] > 2 * iid.params["se"]
+
+
+def test_bootstrap_ci_resamples_dataframe_rows_together(rng):
+    x = rng.normal(0, 0.01, 800)
+    df = pd.DataFrame({"a": x, "b": 0.6 * x + rng.normal(0, 0.008, 800)})
+    ci = k.bootstrap_ci(df, lambda d: d["a"].corr(d["b"]), seed=2, n_boot=300)
+    rho = df["a"].corr(df["b"])
+    assert ci.value == pytest.approx(rho)
+    assert ci.params["lower"] < rho < ci.params["upper"]
+    # Rows stay paired: an interval this tight is impossible if columns were
+    # resampled independently (correlation would collapse toward 0).
+    assert ci.params["lower"] > 0.4
+    fisher = k.pair_correlation(df["a"], df["b"])
+    assert ci.params["lower"] == pytest.approx(fisher.params["lower"], abs=0.03)

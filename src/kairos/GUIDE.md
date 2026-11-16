@@ -71,7 +71,11 @@ conventions (log or simple, annualized or not). They are all in the result.
 | Exposure to several factors | `k.factor_regression(r, factors_df, hac=True)` |
 | Performance against a benchmark | `k.tracking_error`, `k.information_ratio`, `k.capture_ratio`, `k.active_returns` |
 | Reaction to events (earnings, index adds) | `k.event_study(r, b, dates)` |
-| How do assets move together? | `k.correlation(r_df)`; for portfolio math: `k.ledoit_wolf(r_df)` |
+| How correlated are two securities? | `k.pair_correlation(a, b)` (value with a confidence interval) |
+| Is that the market, or specific to the pair? | `k.pair_correlation(a, b, controls=market)` (partial correlation) |
+| Has the correlation been stable? | `k.rolling_correlation(a, b, 63)` |
+| Returns with the market (or factors) removed | `k.residual_returns(r, market)` |
+| How do many assets move together? | `k.correlation(r_df)`; for portfolio math: `k.ledoit_wolf(r_df)` |
 | Portfolio return series | `k.portfolio_returns(r_df, weights)` |
 | Where does portfolio risk come from? | `k.risk_contributions(weights, cov)` |
 | Suggested weights | `k.inverse_vol_weights`, `k.min_variance_weights`, `k.risk_parity_weights` |
@@ -95,6 +99,22 @@ a, b = r["NVDA"], r["SPY"]
 print(k.beta(a, b, hac=True))  # value, alpha, se, t, r2 in params
 print(k.render(k.summary(a, benchmark=b)))
 ```
+
+### How two securities relate
+
+```python
+a, b, mkt = r["CRWV"], r["NVDA"], r["SPY"]
+print(k.pair_correlation(a, b))  # raw correlation with interval
+print(k.pair_correlation(a, b, controls=mkt))  # with the market removed
+print(k.beta(a, b, hac=True))  # how far a moves when b moves
+k.rolling_correlation(a, b, 63)  # is it stable?
+k.bootstrap_ci(r[["CRWV", "NVDA"]], lambda d: d["CRWV"].corr(d["NVDA"]))
+```
+
+Report the raw and the market-adjusted correlation together: two high-beta
+stocks look correlated even with no direct link. Correlation says how
+reliably two series move together; beta says how far one moves per unit of
+the other.
 
 ### Portfolio
 
@@ -131,6 +151,8 @@ es.attrs["kairos"]["events_skipped"]  # events too near the edge of the data
 
 ## Pitfalls
 
+* Never correlate prices. Trending price levels are correlated with almost
+  anything; correlate returns.
 * A Sharpe ratio from a few months of data is mostly noise. Check
   `probabilistic_sharpe` or a bootstrap interval before drawing conclusions.
 * Beta, correlation and volatility change over time. Prefer a stated window
